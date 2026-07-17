@@ -1,6 +1,7 @@
 #include "CloudDiskServer.h"
 #include <iostream>
 #include <csignal>
+#include <workflow/WFFacilities.h>
 
 using namespace std;
 

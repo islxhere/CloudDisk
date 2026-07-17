@@ -1,6 +1,7 @@
 #include "CloudDiskServer.h"
 #include "Config.h"
 #include "CryptoUtil.h"
+#include "OssManager.h"
 #include <nlohmann/json.hpp>
 #include <wfrest/PathUtil.h>
 #include <workflow/HttpUtil.h>
@@ -15,7 +16,6 @@ namespace fs = std::filesystem;
 
 // static const int RetryMax = 3;
 
-static void response_msg(HttpResp *resp, const char *msg, const json &data) {
 static const std::string &database_url() {
     static const std::string value = Config::required("CLOUDDISK_DB_URL");
     return value;
@@ -26,6 +26,7 @@ static const std::string &jwt_secret() {
     return value;
 }
 
+static void response_msg(HttpResp *resp, const char *msg, const json &data) {
     resp->set_header_pair("Content-Type", "application/json");
     json respJson;
     respJson["status"] = "success";
@@ -217,6 +218,22 @@ void CloudDiskServer::register_user_module() {
 }
 
 
+static bool putFromMem(const std::string &bucket, const std::string &osspath, const std::string &content,
+                       OssClient *ossClient) {
+    std::shared_ptr<std::iostream> stream = std::make_shared<std::stringstream>(content);
+    PutObjectRequest request{bucket, osspath, stream};
+    auto outcome = ossClient->PutObject(request);
+
+    if (!outcome.isSuccess()) {
+        std::cout << "PutObject FAILED"
+                << ", code:" << outcome.error().Code()
+                << ", message:" << outcome.error().Message()
+                << ", requestId:" << outcome.error().RequestId() << std::endl;
+        return false;
+    }
+    return true;
+}
+
 void CloudDiskServer::register_file_module() {
     server_.GET("/api/v1/files", [](const HttpReq *req, HttpResp *resp) {
         User user;
@@ -314,6 +331,13 @@ void CloudDiskServer::register_file_module() {
         ofs.close();
 
         // ofstream是阻塞IO，适合小文件上传，对于大文件上传可以使用异步WFFileIOTask
+
+        // oss云存储
+        auto *ossClient = OssManager::instance().getClient();
+        const fs::path oss_storage_path = "upload_files/" + std::to_string(user.id) + "/" + basename;
+        if (!putFromMem("kk-oss-demo", oss_storage_path, content, ossClient)) {
+            // OSS PutObject FAILED
+        }
 
         const std::string sql =
                 "insert into tbl_file(uid, filename, hashcode, size) values(" +

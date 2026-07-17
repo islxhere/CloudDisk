@@ -13,11 +13,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ../)
 
 # 生成的可执行程序
-add_executable(server Config.cpp CryptoUtil.cpp CloudDiskServer.cpp main.cpp)
+add_executable(server Config.cpp CryptoUtil.cpp CloudDiskServer.cpp OssManager.cpp main.cpp)
 
 # 设置编译选项
 # PRIVATE: 传播属性，一般填PRIVATE
-target_compile_options(server PRIVATE -g)
+target_compile_options(server PRIVATE -g -fno-rtti)
 
 # -lcrypto -lssl -ljwt -lwfrest
 target_link_libraries(server PRIVATE crypto ssl jwt wfrest sodium)
+target_link_libraries(server PRIVATE alibabacloud-oss-cpp-sdk curl crypto pthread)
