@@ -2,8 +2,6 @@
 
 #include <cstring>
 
-static auto SECRET_KEY = "$^Hk16NV";
-
 std::string CryptoUtil::generate_hashcode(const void *data, const size_t n) {
     unsigned char output[crypto_hash_sha256_BYTES];
     if (crypto_hash_sha256(output, static_cast<const unsigned char *>(data), n) != 0) {
@@ -38,11 +36,12 @@ bool CryptoUtil::verify_password(const std::string &password, const std::string 
            ) == 0;
 }
 
-std::string CryptoUtil::generate_token(const User &user, jwt_alg_t alg) {
+std::string CryptoUtil::generate_token(const User &user, const std::string &secret, jwt_alg_t alg) {
     jwt_t *jwt;
     jwt_new(&jwt);
 
-    jwt_set_alg(jwt, alg, reinterpret_cast<const unsigned char *>(SECRET_KEY), static_cast<int>(strlen(SECRET_KEY)));
+    jwt_set_alg(jwt, alg, reinterpret_cast<const unsigned char *>(secret.data()),
+                static_cast<int>(secret.size()));
 
     // 设置载荷(Payload): 用户自定义数据(不能存放敏感数据，比如：密码的哈希值)
     jwt_add_grant(jwt, "sub", "login");
@@ -60,11 +59,11 @@ std::string CryptoUtil::generate_token(const User &user, jwt_alg_t alg) {
     return result;
 }
 
-bool CryptoUtil::verify_token(const std::string &token, User &user) {
+bool CryptoUtil::verify_token(const std::string &token, const std::string &secret, User &user) {
     jwt_t *jwt;
     if (jwt_decode(&jwt, token.c_str(),
-                   reinterpret_cast<const unsigned char *>(SECRET_KEY),
-                   static_cast<int>(strlen(SECRET_KEY)))
+                   reinterpret_cast<const unsigned char *>(secret.data()),
+                   static_cast<int>(secret.size()))
     ) { return false; }
 
     if (strcmp("login", jwt_get_grant(jwt, "sub")) != 0) {

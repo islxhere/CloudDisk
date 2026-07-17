@@ -20,9 +20,10 @@ public:
 
     static bool verify_password(const std::string &password, const std::string &pwhash);
 
-    static std::string generate_token(const User &user, jwt_alg_t alg = JWT_ALG_HS256);
+    static std::string generate_token(const User &user, const std::string &secret,
+                                      jwt_alg_t alg = JWT_ALG_HS256);
 
-    static bool verify_token(const std::string &token, User &user);
+    static bool verify_token(const std::string &token, const std::string &secret, User &user);
 
     CryptoUtil() = delete;
 

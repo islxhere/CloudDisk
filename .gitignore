@@ -8,6 +8,11 @@
 # Runtime user-uploaded files
 /upload_files/
 
+# Local secrets and environment configuration
+/.env
+/.env.*
+!/.env.example
+
 # Local agent metadata
 /.agents/
 /.codex/

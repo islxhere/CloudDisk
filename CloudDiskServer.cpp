@@ -1,4 +1,5 @@
 #include "CloudDiskServer.h"
+#include "Config.h"
 #include "CryptoUtil.h"
 #include <nlohmann/json.hpp>
 #include <wfrest/PathUtil.h>
@@ -12,10 +13,19 @@ using namespace wfrest;
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
-static const std::string DatabaseURL = "mysql://root:842596@localhost/clouddisk";
 // static const int RetryMax = 3;
 
 static void response_msg(HttpResp *resp, const char *msg, const json &data) {
+static const std::string &database_url() {
+    static const std::string value = Config::required("CLOUDDISK_DB_URL");
+    return value;
+}
+
+static const std::string &jwt_secret() {
+    static const std::string value = Config::required("CLOUDDISK_JWT_SECRET");
+    return value;
+}
+
     resp->set_header_pair("Content-Type", "application/json");
     json respJson;
     respJson["status"] = "success";
@@ -36,7 +46,7 @@ static bool check_token(const HttpReq *req, User &user) {
     const std::string &token = req->header("Authorization");
     if (token.empty() || token.find("Bearer ") != 0) { return false; }
     const std::string authToken = token.substr(7);
-    return CryptoUtil::verify_token(authToken, user);
+    return CryptoUtil::verify_token(authToken, jwt_secret(), user);
 }
 
 void CloudDiskServer::register_routes() {
@@ -98,7 +108,7 @@ void CloudDiskServer::register_auth_module() {
                 MySQLUtil::escape_string(pwhash) + "', 0) "
                 "on duplicate key update username = username";
 
-        resp->MySQL(DatabaseURL, insertSql, [resp, username](const MySQLResultCursor *cursor) {
+        resp->MySQL(database_url(), insertSql, [resp, username](const MySQLResultCursor *cursor) {
             if (cursor->get_cursor_status() != MYSQL_STATUS_OK) {
                 resp->set_status(HttpStatusInternalServerError);
                 response_msg(resp, "内部服务器错误");
@@ -147,7 +157,7 @@ void CloudDiskServer::register_auth_module() {
         const std::string sql =
                 "select * from tbl_user where username = '" +
                 MySQLUtil::escape_string(username) + "' and tomb = 0";
-        resp->MySQL(DatabaseURL, sql, [resp, password](MySQLResultCursor *cursor) {
+        resp->MySQL(database_url(), sql, [resp, password](MySQLResultCursor *cursor) {
             if (cursor->get_cursor_status() != MYSQL_STATUS_GET_RESULT) {
                 resp->set_status(HttpStatusInternalServerError);
                 response_msg(resp, "内部服务器错误");
@@ -179,7 +189,7 @@ void CloudDiskServer::register_auth_module() {
             }
 
             json data;
-            data["accessToken"] = CryptoUtil::generate_token(user);
+            data["accessToken"] = CryptoUtil::generate_token(user, jwt_secret());
             data["tokenType"] = "Bearer";
             data["user"]["userId"] = user.id;
             data["user"]["username"] = user.username;
@@ -216,7 +226,7 @@ void CloudDiskServer::register_file_module() {
             return;
         }
         const std::string sql = "select * from tbl_file where uid = " + std::to_string(user.id);
-        resp->MySQL(DatabaseURL, sql, [resp](MySQLResultCursor *cursor) {
+        resp->MySQL(database_url(), sql, [resp](MySQLResultCursor *cursor) {
             if (cursor->get_cursor_status() != MYSQL_STATUS_GET_RESULT) {
                 resp->set_status(HttpStatusInternalServerError);
                 response_msg(resp, "内部服务器错误");
@@ -312,7 +322,7 @@ void CloudDiskServer::register_file_module() {
                 MySQLUtil::escape_string(hashcode) + "', " +
                 std::to_string(content.size()) + ")";
 
-        resp->MySQL(DatabaseURL, sql, [resp,basename](const MySQLResultCursor *cursor) {
+        resp->MySQL(database_url(), sql, [resp,basename](const MySQLResultCursor *cursor) {
             if (cursor->get_cursor_status() != MYSQL_STATUS_OK
                 || cursor->get_affected_rows() != 1) {
                 resp->set_status(HttpStatusInternalServerError);
@@ -343,7 +353,7 @@ void CloudDiskServer::register_file_module() {
                 "select filename, hashcode from tbl_file where id = " +
                 std::to_string(fileId) + " and uid = " +
                 std::to_string(userId);
-        resp->MySQL(DatabaseURL, sql, [resp,userId](MySQLResultCursor *cursor) {
+        resp->MySQL(database_url(), sql, [resp,userId](MySQLResultCursor *cursor) {
             if (cursor->get_cursor_status() != MYSQL_STATUS_GET_RESULT) {
                 resp->set_status(HttpStatusInternalServerError);
                 response_msg(resp, "内部服务器错误");
