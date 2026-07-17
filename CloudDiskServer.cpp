@@ -26,7 +26,7 @@ static const std::string &jwt_secret() {
     return value;
 }
 
-static void response_msg(HttpResp *resp, const char *msg, const json &data) {
+static void respond_success(HttpResp *resp, const char *msg, const json &data) {
     resp->set_header_pair("Content-Type", "application/json");
     json respJson;
     respJson["status"] = "success";
@@ -35,7 +35,7 @@ static void response_msg(HttpResp *resp, const char *msg, const json &data) {
     resp->Json(respJson.dump(2));
 }
 
-static void response_msg(HttpResp *resp, const char *msg) {
+static void respond_error(HttpResp *resp, const char *msg) {
     resp->set_header_pair("Content-Type", "application/json");
     json respJson;
     respJson["status"] = "error";
@@ -69,7 +69,7 @@ void CloudDiskServer::register_auth_module() {
         std::string confirm;
         if (req->content_type() != APPLICATION_JSON) {
             resp->set_status(HttpStatusBadRequest);
-            response_msg(resp, "请求格式有误");
+            respond_error(resp, "请求格式有误");
             return;
         }
 
@@ -80,26 +80,26 @@ void CloudDiskServer::register_auth_module() {
             confirm = reqJson.at("confirm").get<std::string>();
         } catch (json::exception &) {
             resp->set_status(HttpStatusBadRequest);
-            response_msg(resp, "请求格式有误");
+            respond_error(resp, "请求格式有误");
             return;
         }
 
         if (password != confirm) {
             resp->set_status(HttpStatusBadRequest);
-            response_msg(resp, "两次输入的密码不一致");
+            respond_error(resp, "两次输入的密码不一致");
             return;
         }
 
         if (username.empty() || password.empty()) {
             resp->set_status(HttpStatusBadRequest);
-            response_msg(resp, "用户名和密码不能为空");
+            respond_error(resp, "用户名和密码不能为空");
             return;
         }
 
         std::string pwhash;
         try { pwhash = CryptoUtil::hash_password(password); } catch (const std::exception &) {
             resp->set_status(HttpStatusInternalServerError);
-            response_msg(resp, "内部服务器错误");
+            respond_error(resp, "内部服务器错误");
             return;
         }
 
@@ -112,19 +112,19 @@ void CloudDiskServer::register_auth_module() {
         resp->MySQL(database_url(), insertSql, [resp, username](const MySQLResultCursor *cursor) {
             if (cursor->get_cursor_status() != MYSQL_STATUS_OK) {
                 resp->set_status(HttpStatusInternalServerError);
-                response_msg(resp, "内部服务器错误");
+                respond_error(resp, "内部服务器错误");
                 return;
             }
 
             if (cursor->get_affected_rows() == 0) {
                 resp->set_status(HttpStatusConflict);
-                response_msg(resp, "用户名已存在");
+                respond_error(resp, "用户名已存在");
                 return;
             }
 
             if (cursor->get_affected_rows() != 1) {
                 resp->set_status(HttpStatusInternalServerError);
-                response_msg(resp, "内部服务器错误");
+                respond_error(resp, "内部服务器错误");
                 return;
             }
 
@@ -132,7 +132,7 @@ void CloudDiskServer::register_auth_module() {
             data["userId"] = cursor->get_insert_id();
             data["username"] = username;
             resp->set_status(HttpStatusCreated);
-            response_msg(resp, "注册成功", data);
+            respond_success(resp, "注册成功", data);
         });
     });
 
@@ -141,7 +141,7 @@ void CloudDiskServer::register_auth_module() {
         std::string password;
         if (req->content_type() != APPLICATION_JSON) {
             resp->set_status(HttpStatusBadRequest);
-            response_msg(resp, "请求格式有误");
+            respond_error(resp, "请求格式有误");
             return;
         }
 
@@ -151,7 +151,7 @@ void CloudDiskServer::register_auth_module() {
             password = reqJson.at("password").get<std::string>();
         } catch (json::exception &) {
             resp->set_status(HttpStatusBadRequest);
-            response_msg(resp, "请求格式有误");
+            respond_error(resp, "请求格式有误");
             return;
         }
 
@@ -161,20 +161,20 @@ void CloudDiskServer::register_auth_module() {
         resp->MySQL(database_url(), sql, [resp, password](MySQLResultCursor *cursor) {
             if (cursor->get_cursor_status() != MYSQL_STATUS_GET_RESULT) {
                 resp->set_status(HttpStatusInternalServerError);
-                response_msg(resp, "内部服务器错误");
+                respond_error(resp, "内部服务器错误");
                 return;
             }
 
             if (cursor->get_rows_count() != 1) {
                 resp->set_status(HttpStatusUnauthorized);
-                response_msg(resp, "用户名或密码错误");
+                respond_error(resp, "用户名或密码错误");
                 return;
             }
 
             std::vector<MySQLCell> record;
             if (!cursor->fetch_row(record)) {
                 resp->set_status(HttpStatusInternalServerError);
-                response_msg(resp, "内部服务器错误");
+                respond_error(resp, "内部服务器错误");
                 return;
             }
 
@@ -185,7 +185,7 @@ void CloudDiskServer::register_auth_module() {
             user.createAt = record.at(3).as_datetime();
             if (!CryptoUtil::verify_password(password, user.pwhash)) {
                 resp->set_status(HttpStatusUnauthorized);
-                response_msg(resp, "用户名或密码错误");
+                respond_error(resp, "用户名或密码错误");
                 return;
             }
 
@@ -195,7 +195,7 @@ void CloudDiskServer::register_auth_module() {
             data["user"]["userId"] = user.id;
             data["user"]["username"] = user.username;
             resp->set_status(HttpStatusOK);
-            response_msg(resp, "登录成功", data);
+            respond_success(resp, "登录成功", data);
         });
     });
 }
@@ -205,7 +205,7 @@ void CloudDiskServer::register_user_module() {
         User user;
         if (!check_token(req, user)) {
             resp->set_status(HttpStatusUnauthorized);
-            response_msg(resp, "无效的访问令牌");
+            respond_error(resp, "无效的访问令牌");
             return;
         }
         json data;
@@ -213,7 +213,7 @@ void CloudDiskServer::register_user_module() {
         data["username"] = user.username;
         data["createdAt"] = user.createAt;
         resp->set_status(HttpStatusOK);
-        response_msg(resp, "获取个人信息成功", data);
+        respond_success(resp, "获取个人信息成功", data);
     });
 }
 
@@ -239,14 +239,14 @@ void CloudDiskServer::register_file_module() {
         User user;
         if (!check_token(req, user)) {
             resp->set_status(HttpStatusUnauthorized);
-            response_msg(resp, "无效的访问令牌");
+            respond_error(resp, "无效的访问令牌");
             return;
         }
         const std::string sql = "select * from tbl_file where uid = " + std::to_string(user.id);
         resp->MySQL(database_url(), sql, [resp](MySQLResultCursor *cursor) {
             if (cursor->get_cursor_status() != MYSQL_STATUS_GET_RESULT) {
                 resp->set_status(HttpStatusInternalServerError);
-                response_msg(resp, "内部服务器错误");
+                respond_error(resp, "内部服务器错误");
                 return;
             }
 
@@ -264,7 +264,7 @@ void CloudDiskServer::register_file_module() {
             json data;
             data["files"] = files;
             resp->set_status(HttpStatusOK);
-            response_msg(resp, "获取文件列表成功", data);
+            respond_success(resp, "获取文件列表成功", data);
         });
     });
 
@@ -272,13 +272,13 @@ void CloudDiskServer::register_file_module() {
         User user;
         if (!check_token(req, user)) {
             resp->set_status(HttpStatusUnauthorized);
-            response_msg(resp, "无效的访问令牌");
+            respond_error(resp, "无效的访问令牌");
             return;
         }
 
         if (req->content_type() != MULTIPART_FORM_DATA) {
             resp->set_status(HttpStatusBadRequest);
-            response_msg(resp, "请求格式有误");
+            respond_error(resp, "请求格式有误");
             return;
         }
 
@@ -286,7 +286,7 @@ void CloudDiskServer::register_file_module() {
         // todo: 先只上传一个文件进行测试，后续改多文件上传测试
         if (form.size() != 1) {
             resp->set_status(HttpStatusBadRequest);
-            response_msg(resp, "请求格式有误");
+            respond_error(resp, "请求格式有误");
             return;
         }
 
@@ -296,7 +296,7 @@ void CloudDiskServer::register_file_module() {
         const std::string basename = PathUtil::base(filename);
         if (basename.empty()) {
             resp->set_status(HttpStatusBadRequest);
-            response_msg(resp, "请求格式有误");
+            respond_error(resp, "请求格式有误");
             return;
         }
 
@@ -307,7 +307,7 @@ void CloudDiskServer::register_file_module() {
             hashcode = CryptoUtil::generate_hashcode(content.c_str(), content.size());
         } catch (std::exception &) {
             resp->set_status(HttpStatusInternalServerError);
-            response_msg(resp, "内部服务器错误");
+            respond_error(resp, "内部服务器错误");
             return;
         }
 
@@ -324,7 +324,7 @@ void CloudDiskServer::register_file_module() {
         std::ofstream ofs{storage_path, std::ios::binary};
         if (!ofs) {
             resp->set_status(HttpStatusInternalServerError);
-            response_msg(resp, "内部服务器错误");
+            respond_error(resp, "内部服务器错误");
             return;
         }
         ofs.write(content.data(), static_cast<std::streamsize>(content.size()));
@@ -350,14 +350,14 @@ void CloudDiskServer::register_file_module() {
             if (cursor->get_cursor_status() != MYSQL_STATUS_OK
                 || cursor->get_affected_rows() != 1) {
                 resp->set_status(HttpStatusInternalServerError);
-                response_msg(resp, "内部服务器错误");
+                respond_error(resp, "内部服务器错误");
                 return;
             }
             json data;
             data["fileId"] = cursor->get_insert_id();
             data["filename"] = basename;
             resp->set_status(HttpStatusCreated);
-            response_msg(resp, "上传成功", data);
+            respond_success(resp, "上传成功", data);
         });
     });
 
@@ -365,7 +365,7 @@ void CloudDiskServer::register_file_module() {
         User user;
         if (!check_token(req, user)) {
             resp->set_status(HttpStatusUnauthorized);
-            response_msg(resp, "无效的访问令牌");
+            respond_error(resp, "无效的访问令牌");
             return;
         }
 
@@ -380,20 +380,20 @@ void CloudDiskServer::register_file_module() {
         resp->MySQL(database_url(), sql, [resp,userId](MySQLResultCursor *cursor) {
             if (cursor->get_cursor_status() != MYSQL_STATUS_GET_RESULT) {
                 resp->set_status(HttpStatusInternalServerError);
-                response_msg(resp, "内部服务器错误");
+                respond_error(resp, "内部服务器错误");
                 return;
             }
 
             if (cursor->get_rows_count() != 1) {
                 resp->set_status(HttpStatusNotFound);
-                response_msg(resp, "文件不存在");
+                respond_error(resp, "文件不存在");
                 return;
             }
 
             std::vector<MySQLCell> record;
             if (!cursor->fetch_row(record)) {
                 resp->set_status(HttpStatusInternalServerError);
-                response_msg(resp, "内部服务器错误");
+                respond_error(resp, "内部服务器错误");
                 return;
             }
 
@@ -402,7 +402,7 @@ void CloudDiskServer::register_file_module() {
 
             if (filename.empty() || hashcode.empty()) {
                 resp->set_status(HttpStatusInternalServerError);
-                response_msg(resp, "内部服务器错误");
+                respond_error(resp, "内部服务器错误");
                 return;
             }
 
