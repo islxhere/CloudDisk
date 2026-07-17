@@ -13,7 +13,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ../)
 
 # 生成的可执行程序
-add_executable(server Config.cpp CryptoUtil.cpp CloudDiskServer.cpp OssManager.cpp main.cpp)
+add_executable(server
+        src/main.cpp
+        src/infra/Config.cpp
+        src/infra/CryptoUtil.cpp
+        src/infra/OssManager.cpp
+        src/routes/AuthRoutes.cpp
+        src/routes/FileRoutes.cpp
+        src/routes/UserRoutes.cpp
+        src/server/CloudDiskServer.cpp)
+
+target_include_directories(server PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/infra
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/routes
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/server)
 
 # 设置编译选项
 # PRIVATE: 传播属性，一般填PRIVATE

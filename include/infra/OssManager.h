@@ -14,6 +14,8 @@ public:
 
 private:
     OssManager();
+
     ~OssManager();
+
     std::unique_ptr<OssClient> client_;
 };
