@@ -108,7 +108,7 @@ void CloudDiskServer::register_file_module() {
 
         std::string hashcode;
         try {
-            hashcode = CryptoUtil::generate_hashcode(content.c_str(), content.size());
+            hashcode = CryptoUtil::generate_hashcode(content.c_str(), content.size()); //
         } catch (std::exception &) {
             resp->set_status(HttpStatusInternalServerError);
             respond_error(resp, "内部服务器错误");
