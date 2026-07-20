@@ -6,9 +6,9 @@
 
 using namespace wfrest;
 using json = nlohmann::json;
-using clouddisk::route::check_token;
-using clouddisk::route::respond_error;
-using clouddisk::route::respond_success;
+using route::check_token;
+using route::respond_error;
+using route::respond_success;
 
 void CloudDiskServer::register_user_module() {
     server_.GET("/api/v1/user/me", [](const HttpReq *req, HttpResp *resp) {

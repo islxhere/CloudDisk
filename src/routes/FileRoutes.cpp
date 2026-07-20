@@ -1,14 +1,12 @@
+#include "BackupPublisher.h"
 #include "CloudDiskServer.h"
 #include "CryptoUtil.h"
-#include "OssManager.h"
+#include "LocalStorage.h"
 #include "RouteSupport.h"
 
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <memory>
+#include <cerrno>
 #include <nlohmann/json.hpp>
-#include <sstream>
+#include <sys/stat.h>
 #include <wfrest/PathUtil.h>
 #include <workflow/HttpUtil.h>
 #include <workflow/MySQLResult.h>
@@ -18,27 +16,12 @@
 using namespace protocol;
 using namespace wfrest;
 using json = nlohmann::json;
-namespace fs = std::filesystem;
-using clouddisk::route::check_token;
-using clouddisk::route::database_url;
-using clouddisk::route::respond_error;
-using clouddisk::route::respond_success;
+using route::check_token;
+using route::database_url;
+using route::respond_error;
+using route::respond_success;
 
-static bool putFromMem(const std::string &bucket, const std::string &osspath, const std::string &content,
-                       OssClient *ossClient) {
-    std::shared_ptr<std::iostream> stream = std::make_shared<std::stringstream>(content);
-    PutObjectRequest request{bucket, osspath, stream};
-    auto outcome = ossClient->PutObject(request);
-
-    if (!outcome.isSuccess()) {
-        std::cout << "PutObject FAILED"
-                << ", code:" << outcome.error().Code()
-                << ", message:" << outcome.error().Message()
-                << ", requestId:" << outcome.error().RequestId() << std::endl;
-        return false;
-    }
-    return true;
-}
+static bool create_directory(const std::string &path) { return mkdir(path.c_str(), 0755) == 0 || errno == EEXIST; }
 
 void CloudDiskServer::register_file_module() {
     server_.GET("/api/v1/files", [](const HttpReq *req, HttpResp *resp) {
@@ -115,23 +98,30 @@ void CloudDiskServer::register_file_module() {
             return;
         }
 
-        const fs::path storage_dir = "./upload_files/" + std::to_string(user.id);
-        fs::create_directories(storage_dir);
-        fs::path storage_path = storage_dir / hashcode;
-
-        std::ofstream ofs{storage_path, std::ios::binary};
-        if (!ofs) {
+        const std::string storage_dir = "./upload_files/" + std::to_string(user.id);
+        const std::string storage_path = storage_dir + "/" + hashcode;
+        if (!create_directory("./upload_files") || !create_directory(storage_dir)) {
             resp->set_status(HttpStatusInternalServerError);
             respond_error(resp, "内部服务器错误");
             return;
         }
-        ofs.write(content.data(), static_cast<std::streamsize>(content.size()));
-        ofs.close();
 
-        auto *ossClient = OssManager::instance().getClient();
-        const fs::path oss_storage_path = "upload_files/" + std::to_string(user.id) + "/" + basename;
-        if (!putFromMem("kk-oss-demo", oss_storage_path, content, ossClient)) {
-            // OSS PutObject FAILED
+        if (!writeFile(storage_path, content)) {
+            resp->set_status(HttpStatusInternalServerError);
+            respond_error(resp, "内部服务器错误");
+            return;
+        }
+
+        try {
+            publish({
+                .uid = user.id,
+                .filename = basename,
+                .hashcode = hashcode
+            });
+        } catch (const std::exception &) {
+            resp->set_status(HttpStatusInternalServerError);
+            respond_error(resp, "内部服务器错误");
+            return;
         }
 
         const std::string sql =

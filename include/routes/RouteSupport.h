@@ -10,7 +10,7 @@ namespace wfrest {
     class HttpResp;
 }
 
-namespace clouddisk::route {
+namespace route {
     const std::string &database_url();
 
     const std::string &jwt_secret();
@@ -20,4 +20,4 @@ namespace clouddisk::route {
     void respond_error(wfrest::HttpResp *resp, const char *msg);
 
     bool check_token(const wfrest::HttpReq *req, User &user);
-} // namespace clouddisk::route
+} // namespace route
