@@ -11,10 +11,10 @@
 using namespace protocol;
 using namespace wfrest;
 using json = nlohmann::json;
-using clouddisk::route::database_url;
-using clouddisk::route::jwt_secret;
-using clouddisk::route::respond_error;
-using clouddisk::route::respond_success;
+using route::database_url;
+using route::jwt_secret;
+using route::respond_error;
+using route::respond_success;
 
 void CloudDiskServer::register_auth_module() {
     server_.POST("/api/v1/auth/register", [](const HttpReq *req, HttpResp *resp) {

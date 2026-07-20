@@ -19,10 +19,10 @@ using namespace protocol;
 using namespace wfrest;
 using json = nlohmann::json;
 namespace fs = std::filesystem;
-using clouddisk::route::check_token;
-using clouddisk::route::database_url;
-using clouddisk::route::respond_error;
-using clouddisk::route::respond_success;
+using route::check_token;
+using route::database_url;
+using route::respond_error;
+using route::respond_success;
 
 static bool putFromMem(const std::string &bucket, const std::string &osspath, const std::string &content,
                        OssClient *ossClient) {
