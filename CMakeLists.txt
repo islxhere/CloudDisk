@@ -18,6 +18,7 @@ add_executable(server
         src/infra/Config.cpp
         src/infra/BackupPublisher.cpp
         src/infra/CryptoUtil.cpp
+        src/infra/LocalStorage.cpp
         src/infra/OssManager.cpp
         src/routes/AuthRoutes.cpp
         src/routes/FileRoutes.cpp
