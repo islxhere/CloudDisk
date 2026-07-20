@@ -1,6 +1,10 @@
 #include "OssManager.h"
 #include "Config.h"
 
+#include <fstream>
+#include <iostream>
+#include <memory>
+
 OssManager::OssManager() {
     InitializeSdk();
 
@@ -26,4 +30,34 @@ OssManager &OssManager::instance() {
     return ossManager;
 }
 
-OssClient *OssManager::getClient() const { return client_.get(); }
+bool OssManager::putFromMem(const std::string &bucket, const std::string &ossPath, const std::string &content) const {
+    auto stream = std::make_shared<std::stringstream>(content);
+    PutObjectRequest request{bucket, ossPath, stream};
+    const auto outcome = client_->PutObject(request);
+    if (!outcome.isSuccess()) {
+        std::cerr << "PutObject FAILED, code: " << outcome.error().Code()
+                << ", message: " << outcome.error().Message()
+                << ", requestId: " << outcome.error().RequestId() << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool OssManager::putFromFile(const std::string &bucket, const std::string &ossPath,
+                             const std::string &localPath) const {
+    auto stream = std::make_shared<std::fstream>(localPath, std::ios::in | std::ios::binary);
+    if (!*stream) {
+        std::cerr << "无法读取备份文件: " << localPath << std::endl;
+        return false;
+    }
+
+    PutObjectRequest request{bucket, ossPath, stream};
+    const auto outcome = client_->PutObject(request);
+    if (!outcome.isSuccess()) {
+        std::cerr << "PutObject FAILED, code: " << outcome.error().Code()
+                << ", message: " << outcome.error().Message()
+                << ", requestId: " << outcome.error().RequestId() << std::endl;
+        return false;
+    }
+    return true;
+}

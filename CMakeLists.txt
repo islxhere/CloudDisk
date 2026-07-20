@@ -16,6 +16,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ../)
 add_executable(server
         src/main.cpp
         src/infra/Config.cpp
+        src/infra/BackupPublisher.cpp
         src/infra/CryptoUtil.cpp
         src/infra/OssManager.cpp
         src/routes/AuthRoutes.cpp
@@ -34,4 +35,16 @@ target_compile_options(server PRIVATE -g -fno-rtti)
 
 # -lcrypto -lssl -ljwt -lwfrest
 target_link_libraries(server PRIVATE crypto ssl jwt wfrest sodium)
-target_link_libraries(server PRIVATE alibabacloud-oss-cpp-sdk curl crypto pthread)
+target_link_libraries(server PRIVATE alibabacloud-oss-cpp-sdk curl crypto pthread SimpleAmqpClient)
+
+add_executable(backup
+        src/backup_client.cpp
+        src/infra/BackupPublisher.cpp
+        src/infra/Config.cpp
+        src/infra/OssManager.cpp)
+
+target_include_directories(backup PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/infra)
+
+target_compile_options(backup PRIVATE -g -fno-rtti)
+target_link_libraries(backup PRIVATE alibabacloud-oss-cpp-sdk curl crypto pthread SimpleAmqpClient)
