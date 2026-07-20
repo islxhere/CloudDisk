@@ -1,5 +1,6 @@
 #pragma once
 #include <alibabacloud/oss/OssClient.h>
+#include <string>
 using namespace AlibabaCloud::OSS;
 
 class OssManager {
@@ -10,10 +11,14 @@ public:
 
     OssManager &operator=(const OssManager &) = delete;
 
-    OssClient *getClient() const;
+    bool putFromMem(const std::string &bucket, const std::string &ossPath, const std::string &content) const;
+
+    bool putFromFile(const std::string &bucket, const std::string &ossPath, const std::string &localPath) const;
 
 private:
     OssManager();
+
     ~OssManager();
+
     std::unique_ptr<OssClient> client_;
 };

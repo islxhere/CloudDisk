@@ -47,7 +47,7 @@ std::string CryptoUtil::generate_token(const User &user, const std::string &secr
     jwt_add_grant(jwt, "sub", "login");
     jwt_add_grant_int(jwt, "id", user.id);
     jwt_add_grant(jwt, "username", user.username.c_str());
-    jwt_add_grant(jwt,"createdAt",user.createAt.c_str());
+    jwt_add_grant(jwt, "createdAt", user.createAt.c_str());
     jwt_add_grant_int(jwt, "expire", time(nullptr) + 1800);
 
     char *token = jwt_encode_str(jwt);
