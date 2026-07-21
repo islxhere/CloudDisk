@@ -23,12 +23,14 @@ add_executable(server
         src/routes/AuthRoutes.cpp
         src/routes/FileRoutes.cpp
         src/routes/UserRoutes.cpp
+        src/auth_server/auth.pb.cc
         src/server/CloudDiskServer.cpp)
 
 target_include_directories(server PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/infra
         ${CMAKE_CURRENT_SOURCE_DIR}/include/routes
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/server)
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/server
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/auth_server)
 
 # 设置编译选项
 # PRIVATE: 传播属性，一般填PRIVATE
@@ -37,6 +39,7 @@ target_compile_options(server PRIVATE -g -fno-rtti)
 # -lcrypto -lssl -ljwt -lwfrest
 target_link_libraries(server PRIVATE crypto ssl jwt wfrest sodium)
 target_link_libraries(server PRIVATE alibabacloud-oss-cpp-sdk curl crypto pthread SimpleAmqpClient)
+target_link_libraries(server PRIVATE srpc lz4 snappy protobuf workflow)
 
 add_executable(backup
         src/backup_client.cpp
@@ -49,3 +52,16 @@ target_include_directories(backup PRIVATE
 
 target_compile_options(backup PRIVATE -g -fno-rtti)
 target_link_libraries(backup PRIVATE alibabacloud-oss-cpp-sdk curl crypto pthread SimpleAmqpClient)
+
+add_executable(auth_server
+        src/infra/Config.cpp
+        src/infra/CryptoUtil.cpp
+        src/auth_server/auth.pb.cc
+        src/auth_server/AuthServer.cpp)
+
+target_include_directories(auth_server PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/auth_server
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/infra)
+
+target_link_libraries(auth_server PRIVATE crypto ssl jwt sodium)
+target_link_libraries(auth_server PRIVATE srpc lz4 snappy protobuf workflow)

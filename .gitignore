@@ -5,6 +5,7 @@
 # CMake output configured at the project root
 /server
 /backup
+/auth_server
 
 # Runtime user-uploaded files
 /upload_files/

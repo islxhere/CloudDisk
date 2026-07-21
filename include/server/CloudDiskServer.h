@@ -1,10 +1,13 @@
 #pragma once
 #include <wfrest/HttpServer.h>
 
+#include "auth.srpc.h"
+#include "RouteSupport.h"
+
 
 class CloudDiskServer {
 public:
-    CloudDiskServer() = default;
+    CloudDiskServer();
 
     void register_routes();
 
@@ -26,4 +29,5 @@ private:
 
 private:
     wfrest::HttpServer server_;
+    Auth::SRPCClient srpc_client_;
 };
