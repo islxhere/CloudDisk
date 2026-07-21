@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+enum AuthResult {
+    AUTH_RESULT_UNSPECIFIED = 0;
+    AUTH_RESULT_SUCCESS = 1;
+    AUTH_RESULT_PASSWORD_MISMATCH = 2;
+    AUTH_RESULT_EMPTY_CREDENTIALS = 3;
+    AUTH_RESULT_USERNAME_EXISTS = 4;
+    AUTH_RESULT_INVALID_CREDENTIALS = 5;
+    AUTH_RESULT_INTERNAL_ERROR = 6;
+}
+
+message RegisterRequest {
+    string username = 1;
+    string password = 2;
+    string confirm = 3;
+}
+
+message RegisterResponse {
+    uint64 userId = 2;
+    string username = 3;
+    AuthResult result = 4;
+}
+
+message LoginRequest {
+    string username = 1;
+    string password = 2;
+}
+
+message LoginResponse {
+    string accessToken = 1;
+    string tokenType = 2;
+    uint64 userId = 3;
+    string username = 4;
+    AuthResult result = 5;
+}
+
+service Auth {
+    rpc Register(RegisterRequest) returns (RegisterResponse);
+    rpc Login(LoginRequest) returns (LoginResponse);
+}
