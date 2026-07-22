@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.15)
 #   项目可以包含多个目标(target)
 #   target: 可执行程序, 静态库, 动态库
 project(CloudDisk)
+find_package(ppconsul CONFIG REQUIRED)
 
 # 指定C++的版本: -std=c++17
 set(CMAKE_CXX_STANDARD 17)
@@ -65,3 +66,4 @@ target_include_directories(auth_server PRIVATE
 
 target_link_libraries(auth_server PRIVATE crypto ssl jwt sodium)
 target_link_libraries(auth_server PRIVATE srpc lz4 snappy protobuf workflow)
+target_link_libraries(auth_server PRIVATE ppconsul)
