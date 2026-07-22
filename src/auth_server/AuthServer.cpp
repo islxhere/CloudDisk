@@ -6,11 +6,15 @@
 #include <csignal>
 #include <workflow/MySQLUtil.h>
 #include <workflow/MySQLResult.h>
+#include <ppconsul/agent.h>
 
 using namespace srpc;
 using namespace protocol;
+using namespace ppconsul;
+// using namespace ppconsul::agent;
 
 static WFFacilities::WaitGroup waitGroup{1};
+static WFFacilities::WaitGroup heartbeatWaitGroup{1};
 
 const std::string &database_url() {
     static const std::string value = Config::required("CLOUDDISK_DB_URL");
@@ -19,6 +23,12 @@ const std::string &database_url() {
 
 const std::string &jwt_secret() {
     static const std::string value = Config::required("CLOUDDISK_JWT_SECRET");
+    return value;
+}
+
+unsigned short auth_port() {
+    static const ushort value = static_cast<ushort>(
+        std::stoi(Config::required("CLOUDDISK_AUTH_PORT")));
     return value;
 }
 
@@ -160,6 +170,24 @@ public:
     }
 };
 
+void timer_callback(WFTimerTask *task) {
+    if (const int state = task->get_state(); state != WFT_STATE_SUCCESS) return;
+
+    SeriesWork *series = series_of(task);
+    auto *agent = static_cast<agent::Agent *>(series->get_context());
+    try {
+        agent->servicePass(Config::required("CLOUDDISK_AUTH_INSTANCE_ID"));
+    } catch (const std::exception &) {
+    }
+
+    WFTimerTask *next = WFTaskFactory::create_timer_task(
+        "auth_check",
+        5, 0,
+        timer_callback
+    );
+    series->push_back(next);
+}
+
 int main() {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -169,8 +197,42 @@ int main() {
     AuthServiceImpl service;
     server.add_service(&service);
 
-    if (!server.start(1412)) {
+    const unsigned short port = auth_port();
+    if (!server.start(port)) {
+        Consul consul(
+            Config::required("CLOUDDISK_CONSUL_URL"),
+            kw::dc = "dc1"
+        );
+        agent::Agent agent{consul};
+        agent.registerService(
+            agent::kw::name = "auth-service",
+            agent::kw::id = Config::required("CLOUDDISK_AUTH_INSTANCE_ID"),
+            agent::kw::address = Config::required("CLOUDDISK_AUTH_ADVERTISE_ADDRESS"),
+            agent::kw::port = port,
+            agent::kw::check = agent::TtlCheck{std::chrono::seconds{10}}
+        );
+
+        try {
+            agent.servicePass(Config::required("CLOUDDISK_AUTH_INSTANCE_ID"));
+        } catch (const std::exception &) {
+        }
+        WFTimerTask *timeTask = WFTaskFactory::create_timer_task(
+            "auth_check",
+            5, 0,
+            timer_callback
+        );
+
+        SeriesWork *series = Workflow::create_series_work(
+            timeTask,
+            [](const SeriesWork *) { heartbeatWaitGroup.done(); }
+        );
+        series->set_context(&agent);
+        series->start();
+
         waitGroup.wait();
+        WFTaskFactory::cancel_by_name("auth_check");
+        heartbeatWaitGroup.wait();
+        agent.deregisterService(Config::required("CLOUDDISK_AUTH_INSTANCE_ID"));
         server.stop();
     } else std::cerr << "Error: Auth server start failed" << std::endl;
 

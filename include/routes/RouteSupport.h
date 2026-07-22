@@ -15,10 +15,6 @@ namespace route {
 
     const std::string &jwt_secret();
 
-    const std::string &auth_host();
-
-    unsigned short auth_port();
-
     void respond_success(wfrest::HttpResp *resp, const char *msg, const nlohmann::json &data);
 
     void respond_error(wfrest::HttpResp *resp, const char *msg);

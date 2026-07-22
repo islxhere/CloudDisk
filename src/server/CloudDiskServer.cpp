@@ -18,17 +18,6 @@ namespace route {
         return value;
     }
 
-    const std::string &auth_host() {
-        static const std::string value = Config::required("CLOUDDISK_AUTH_HOST");
-        return value;
-    }
-
-    unsigned short auth_port() {
-        static const ushort value = static_cast<ushort>(
-            std::stoi(Config::required("CLOUDDISK_AUTH_PORT")));
-        return value;
-    }
-
     void respond_success(HttpResp *resp, const char *msg, const json &data) {
         resp->set_header_pair("Content-Type", "application/json");
         json respJson;
@@ -54,8 +43,7 @@ namespace route {
     }
 } // namespace route
 
-CloudDiskServer::CloudDiskServer()
-        : srpc_client_(route::auth_host().c_str(), route::auth_port()) {}
+CloudDiskServer::CloudDiskServer() = default;
 
 void CloudDiskServer::register_routes() {
     register_www_module();

@@ -29,5 +29,4 @@ private:
 
 private:
     wfrest::HttpServer server_;
-    Auth::SRPCClient srpc_client_;
 };
